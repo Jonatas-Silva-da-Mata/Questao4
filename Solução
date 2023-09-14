@@ -1,0 +1,58 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+#define NUM_CADEIRAS 5
+
+sem_t sem_cadeira_barbeiro;
+sem_t sem_cadeira_espera;
+sem_t sem_barbeiro;
+
+void *barbeiro(void *arg) {
+    while (1) {
+        sem_wait(&sem_cadeira_espera); // Aguarda um cliente (ou adormece)
+
+        printf("Barbeiro está cortando o cabelo.\n");
+        sleep(2); // Simula o corte de cabelo
+        printf("Barbeiro terminou o corte de cabelo.\n");
+
+        sem_post(&sem_barbeiro); // Libera o cliente
+    }
+}
+
+void *cliente(void *arg) {
+    while (1) {
+        if (sem_trywait(&sem_cadeira_barbeiro) == 0) { // Verifica se a cadeira do barbeiro está livre
+            printf("Cliente está acordando o barbeiro e cortando o cabelo.\n");
+            sem_post(&sem_cadeira_espera); // Libera uma cadeira de espera
+            sem_wait(&sem_barbeiro); // Aguarda o corte de cabelo
+        } else if (sem_trywait(&sem_cadeira_espera) == 0) { // Verifica se uma cadeira de espera está livre
+            printf("Cliente encontrou uma cadeira de espera e está aguardando.\n");
+            sem_wait(&sem_cadeira_barbeiro); // Ocupa a cadeira do barbeiro
+        } else {
+            printf("Cliente não encontrou cadeiras livres e foi embora.\n");
+        }
+
+        sleep(rand() % 5); // Simula o tempo entre a chegada de clientes
+    }
+}
+
+int main() {
+	sem_wait(&sem_cadeira_barbeiro); // Aguarda a cadeira do barbeiro //correção
+
+    sem_init(&sem_cadeira_barbeiro, 0, 1);
+    sem_init(&sem_cadeira_espera, 0, NUM_CADEIRAS);
+    sem_init(&sem_barbeiro, 0, 0);
+
+    pthread_t tid_barbeiro, tid_cliente;
+
+    pthread_create(&tid_barbeiro, NULL, barbeiro, NULL);
+    pthread_create(&tid_cliente, NULL, cliente, NULL);
+
+    pthread_join(tid_barbeiro, NULL);
+    pthread_join(tid_cliente, NULL);
+
+    return 0;
+}
